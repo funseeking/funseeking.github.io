@@ -10,11 +10,13 @@ Steps to create this web-app:
 6. App.js > Add this above `function App()`
 
 // firebase SDK
+
 import firebase from "firebase/compat/app";
 import "firebase/compat/firestore";
 import "firebase/compat/auth";
 
 // hooks
+
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useCollectionData } from "react-firebase-hooks/firestore";
 
@@ -28,15 +30,6 @@ const firestore = firebase.firestore();
 9. Cloud Firestore > Create databse
 10. Project Settings > No apps > Add web-app (don't set up hosting)
 11. Add Firebase SDK to `firebase.initializeApp({});`
-
-apiKey: "AIzaSyDT3SlIEx-KjXMhH9b64KimDPv3NkfDR2Y",
-authDomain: "fun-seeking.firebaseapp.com",
-projectId: "fun-seeking",
-storageBucket: "fun-seeking.appspot.com",
-messagingSenderId: "346317536610",
-appId: "1:346317536610:web:bd6f184063c7abe682c03b",
-measurementId: "G-ND837YRNW8"
-
 12. `npm install tailwindcss@latest`
 13. `npm install @headlessui/react @heroicons/react`
 14. In `web-app/package.json` add to dependencies:

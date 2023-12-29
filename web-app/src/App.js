@@ -6,10 +6,16 @@ import "firebase/compat/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
 import React, { useEffect, useState } from "react";
 import { auth, firestore } from "./Firebase.js";
+import { challenges } from "./Challenges.js";
 
 function App() {
   const [user] = useAuthState(auth);
-  const [userData, setUserData] = useState();
+  const [userData, setUserData] = useState({
+    numCompleted: 0,
+    completed: [],
+    uid: "",
+    name: "",
+  });
 
   useEffect(() => {
     if (user) {
@@ -21,6 +27,7 @@ function App() {
             setUserData(docSnapshot.data());
           } else {
             const data = {
+              numCompleted: 0,
               completed: [],
               uid: user.uid,
               name: user.displayName,
@@ -35,6 +42,19 @@ function App() {
     }
   }, [user]);
 
+  const handleChallengeCompleted = (completedChallenge) => {
+    const updatedUserData = {
+      ...userData,
+      completed: [...userData.completed, completedChallenge],
+    };
+
+    // Update the user's document in Firestore
+    firestore.collection("userInfo").doc(user.uid).set(updatedUserData);
+
+    // Update the state to trigger a re-render
+    setUserData(updatedUserData);
+  };
+
   return (
     <div className="flex flex-col items-center justify-center h-screen gap-6 w-100">
       <Intro />
@@ -42,9 +62,14 @@ function App() {
         <>
           <SignOut />
           <div className="flex flex-col lg:flex-row items-center justify-center gap-2 p-2 w-screen">
-            {userData && <CompletedChallenges data={userData.completed} />}
-            <CurrentChallenge />
-            <Leaderboard />
+            {userData && (
+              <CompletedChallenges completedChallenges={userData.completed} />
+            )}
+            <CurrentChallenge
+              completedChallenges={userData.completed}
+              onChallengeCompleted={handleChallengeCompleted}
+            />
+            <Leaderboard data={userData} />
           </div>
         </>
       ) : (
@@ -72,14 +97,13 @@ function Intro() {
   );
 }
 
-function CompletedChallenges({ data }) {
-  // query database for completed challenges
+function CompletedChallenges({ completedChallenges }) {
   return (
     <div className="lg:h-full flex flex-col items-center gap-2 w-1/3 sm:w-1/2 xs:w-full p-6 rounded-lg text-white bg-lime-500">
       <h1 className="text-xl">Completed</h1>
       <table>
         <tbody>
-          {data.map((challenge, index) => (
+          {completedChallenges.map((challenge, index) => (
             <tr key={index + 1}>
               <td className="font-bold">{index + 1}</td>
               <td>{challenge}</td>
@@ -91,27 +115,74 @@ function CompletedChallenges({ data }) {
   );
 }
 
-function CurrentChallenge() {
-  // query database for completed challenges
+function CurrentChallenge({ completedChallenges, onChallengeCompleted }) {
+  const [currentChallenge, setCurrentChallenge] = useState(null);
+
+  const availableChallenges = challenges.filter(
+    (challenge) => !completedChallenges.includes(challenge)
+  );
+
+  const getRandomChallenge = () => {
+    if (availableChallenges.length > 0) {
+      const randomIndex = Math.floor(
+        Math.random() * availableChallenges.length
+      );
+      setCurrentChallenge(availableChallenges[randomIndex]);
+    } else {
+      setCurrentChallenge(null);
+    }
+  };
+
+  const handleSkip = () => {
+    getRandomChallenge();
+  };
+
+  const handleCompleted = () => {
+    if (currentChallenge) {
+      // Add the completed challenge to the user's document
+      onChallengeCompleted(currentChallenge);
+
+      // Get a new random challenge
+      getRandomChallenge();
+    }
+  };
+
+  useEffect(() => {
+    getRandomChallenge(); // Set a new random challenge initially
+  }, [completedChallenges]);
+
+  // Display the current challenge or a message if no challenges available
+  const challengeDisplay = currentChallenge ? (
+    <p className="text-center">{currentChallenge}</p>
+  ) : (
+    <p className="text-center">No challenges available</p>
+  );
+
   return (
     <div className="lg:h-full flex flex-col items-center gap-2 w-1/3 sm:w-1/2 xs:w-full p-6 rounded-lg text-white bg-amber-500">
       <h1 className="text-xl">Challenge</h1>
-      <div className="py-6 text-3xl">
-        <p>Dance in public</p>
-      </div>
-      <div className="flex flex-col sm:flex-row gap-2">
-        <button className="text-amber-500 rounded-3xl bg-white px-4 py-2 font-bold">
-          COMPLETED
-        </button>
-        <button className="rounded-3xl border border-2 border-white px-4 py-2 font-bold text-white">
-          SKIP
-        </button>
-      </div>
+      <div className="py-6 text-3xl">{challengeDisplay}</div>
+      {currentChallenge && (
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            onClick={handleCompleted}
+            className="text-amber-500 rounded-3xl bg-white px-4 py-2 font-bold"
+          >
+            COMPLETED
+          </button>
+          <button
+            onClick={handleSkip}
+            className="rounded-3xl border border-2 border-white px-4 py-2 font-bold text-white"
+          >
+            SKIP
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function Leaderboard() {
+function Leaderboard({ data }) {
   const [leaderboardData, setLeaderboardData] = useState([]);
 
   useEffect(() => {
@@ -119,7 +190,7 @@ function Leaderboard() {
       try {
         const querySnapshot = await firestore
           .collection("userInfo")
-          .orderBy("completed", "desc")
+          .orderBy("numCompleted", "desc")
           .limit(10)
           .get();
 
@@ -137,7 +208,7 @@ function Leaderboard() {
     };
 
     fetchData();
-  }, []);
+  }, [data]);
 
   return (
     <div className="lg:h-full flex flex-col items-center gap-2 w-1/3 sm:w-1/2 xs:w-full p-6 rounded-lg text-white bg-sky-500">
